@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Competitive Tennis Game</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #87CEEB;
+            font-family: Arial, sans-serif;
+        }
+
+        header {
+            background-color: #333;
+            color: white;
+            padding: 10px 20px;
+            text-align: center;
+        }
+
+        header a {
+            margin: 0 15px;
+            color: white;
+            text-decoration: none;
+            font-weight: bold;
+        }
+
+        canvas {
+            display: block;
+            background-image: url('https://upload.wikimedia.org/wikipedia/commons/c/c6/Tennis_court_with_ball_in_foreground.jpg');
+            background-size: cover;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        .scoreboard {
+            position: absolute;
+            top: 50px;
+            left: 10px;
+            font-size: 20px;
+            color: white;
+            text-shadow: 2px 2px 4px #000;
+            z-index: 10;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation Header -->
+    <header>
+        <a href="../index.html">Back to Resume</a>
+        <a href="../html/scratch.html">See Scratch Page</a>
+    </header>
+
+    <div class="scoreboard">Player: 0 | Opponent: 0</div>
+    <canvas id="gameCanvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById("gameCanvas");
+        const ctx = canvas.getContext("2d");
+
+        // Canvas dimensions
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        // Player object
+        const player = {
+            x: canvas.width / 2 - 75,
+            y: canvas.height - 50, // Moved up to make it visible
+            width: 150,
+            height: 15,
+            color: "#FF00FF", // Bright magenta color
+        };
+
+        // Opponent object
+        const opponent = {
+            x: canvas.width / 2 - 75,
+            y: 10,
+            width: 150,
+            height: 15,
+            color: "red",
+            speed: 4,
+            errorChance: 0.1,
+        };
+
+        // Ball object
+        const ball = {
+            x: canvas.width / 2,
+            y: canvas.height / 2,
+            radius: 10,
+            color: "yellow",
+            dx: 4,
+            dy: 4,
+            speed: 4,
+        };
+
+        let playerScore = 0;
+        let opponentScore = 0;
+        let rallyCount = 0;
+
+        // Player movement with mouse
+        canvas.addEventListener("mousemove", (event) => {
+            const canvasRect = canvas.getBoundingClientRect();
+            player.x = event.clientX - canvasRect.left - player.width / 2;
+            player.x = Math.max(0, Math.min(canvas.width - player.width, player.x)); // Prevent player from leaving canvas
+        });
+
+        // Draw rectangle function
+        function drawRect(x, y, width, height, color) {
+            ctx.fillStyle = color;
+            ctx.fillRect(x, y, width, height);
+        }
+
+        // Draw circle function
+        function drawCircle(x, y, radius, color) {
+            ctx.beginPath();
+            ctx.arc(x, y, radius, 0, Math.PI * 2);
+            ctx.fillStyle = color;
+            ctx.fill();
+            ctx.closePath();
+        }
+
+        // Draw net function
+        function drawNet() {
+            ctx.strokeStyle = "white";
+            ctx.lineWidth = 2;
+            for (let i = 0; i < canvas.width; i += 20) {
+                ctx.beginPath();
+                ctx.moveTo(i, canvas.height / 2);
+                ctx.lineTo(i + 10, canvas.height / 2);
+                ctx.stroke();
+            }
+        }
+
+        // Reset ball to the center
+        function resetBall() {
+            ball.x = canvas.width / 2;
+            ball.y = canvas.height / 2;
+            ball.speed = 4; // Reset speed
+            ball.dx = ball.speed * (Math.random() < 0.5 ? 1 : -1);
+            ball.dy = ball.speed * (Math.random() < 0.5 ? 1 : -1);
+            rallyCount = 0;
+        }
+
+        // Increase ball speed
+        function increaseBallSpeed() {
+            rallyCount++;
+            ball.speed += 0.2; // Increment speed gradually
+            ball.dx = ball.dx > 0 ? ball.speed : -ball.speed;
+            ball.dy = ball.dy > 0 ? ball.speed : -ball.speed;
+        }
+
+        // Update game objects
+        function update() {
+            // Move the ball
+            ball.x += ball.dx;
+            ball.y += ball.dy;
+
+            // Ball collision with walls
+            if (ball.x + ball.radius > canvas.width || ball.x - ball.radius < 0) {
+                ball.dx *= -1;
+            }
+
+            // Ball collision with player paddle
+            if (
+                ball.y + ball.radius > player.y &&
+                ball.x > player.x &&
+                ball.x < player.x + player.width
+            ) {
+                ball.dy *= -1;
+                ball.y = player.y - ball.radius; // Prevent sticking
+                increaseBallSpeed();
+            }
+
+            // Ball collision with opponent paddle
+            if (
+                ball.y - ball.radius < opponent.y + opponent.height &&
+                ball.x > opponent.x &&
+                ball.x < opponent.x + opponent.width &&
+                Math.random() > opponent.errorChance // Random chance for opponent to miss
+            ) {
+                ball.dy *= -1;
+                ball.y = opponent.y + opponent.height + ball.radius; // Prevent sticking
+                increaseBallSpeed();
+                opponent.errorChance += 0.01; // Slightly increase chance to miss
+            }
+
+            // Ball goes past player
+            if (ball.y + ball.radius > canvas.height) {
+                opponentScore++;
+                updateScoreboard();
+                resetBall();
+            }
+
+            // Ball goes past opponent
+            if (ball.y - ball.radius < 0) {
+                playerScore++;
+                updateScoreboard();
+                resetBall();
+            }
+
+            // Opponent AI follows ball's x position
+            if (ball.x > opponent.x + opponent.width / 2) {
+                opponent.x += opponent.speed;
+            } else if (ball.x < opponent.x + opponent.width / 2) {
+                opponent.x -= opponent.speed;
+            }
+
+            // Prevent opponent from leaving canvas
+            opponent.x = Math.max(0, Math.min(canvas.width - opponent.width, opponent.x));
+        }
+
+        // Update scoreboard
+        function updateScoreboard() {
+            document.querySelector(".scoreboard").innerText = `Player: ${playerScore} | Opponent: ${opponentScore}`;
+        }
+
+        // Render game objects
+        function render() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            drawNet();
+            drawRect(player.x, player.y, player.width, player.height, player.color);
+            drawRect(opponent.x, opponent.y, opponent.width, opponent.height, opponent.color);
+            drawCircle(ball.x, ball.y, ball.radius, ball.color);
+        }
+
+        // Game loop
+        function gameLoop() {
+            update();
+            render();
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Start the game
+        resetBall();
+        gameLoop();
+    </script>
+</body>
+</html>
